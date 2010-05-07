@@ -79,24 +79,41 @@ void flickrkio::enterLoop()
 
 void flickrkio::listDir( const KUrl &url )
 {
-  kDebug(7233) << "Start List Dir";
-  
+  kDebug() << "Start List Dir";
   
   // create a JSonDriver instance
     QJson::Parser parser;
     bool ok;
     
-  
+    QFile photoset_data("/home/david/projects/flickrkio/flickrkio/example_data/photoset_request.json");
+    if (!photoset_data.open(QIODevice::ReadOnly | QIODevice::Text))
+         return;
+    
+    QVariantMap result = parser.parse(photoset_data.readAll(),&ok).toMap();
+    
+    kDebug(7000) << "listDir";
+    kDebug(7000) << ok;
+        
     UDSEntry e;
 
-    e.clear();
-    e.insert( KIO::UDSEntry::UDS_NAME, QFile::decodeName("Cheese"));
-    e.insert( KIO::UDSEntry::UDS_FILE_TYPE, S_IFDIR);
-    e.insert( KIO::UDSEntry::UDS_ACCESS, 0400);
-    e.insert( KIO::UDSEntry::UDS_SIZE, 10);
-  
-    listEntry(e,false);
+    foreach (QVariant photoset, result["photosets"].toMap()["photoset"].toList())
+    {
+      QString title = photoset.toMap()["title"].toMap()["_content"].toString();
+      QString photoset_id = photoset.toMap()["id"].toString();
+
+      if (! title.isEmpty())
+      {
+        e.clear();
+        e.insert( KIO::UDSEntry::UDS_NAME, photoset_id);
+        e.insert( KIO::UDSEntry::UDS_DISPLAY_NAME, title);
+        e.insert( KIO::UDSEntry::UDS_FILE_TYPE, S_IFDIR);
+        e.insert( KIO::UDSEntry::UDS_ACCESS, 0400);
+        e.insert( KIO::UDSEntry::UDS_SIZE, 10);
+        listEntry(e,false);
+      }
+    }
     
+    e.clear();
     listEntry(e,true);
     
     finished();
