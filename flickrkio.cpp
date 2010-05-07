@@ -6,6 +6,7 @@
 #include <kdebug.h>
 #include <KApplication>
 #include <kcmdlineargs.h>
+#include <qjson/parser.h>
 
 using namespace KIO;
 
@@ -79,7 +80,26 @@ void flickrkio::enterLoop()
 void flickrkio::listDir( const KUrl &url )
 {
   kDebug(7233) << "Start List Dir";
+  
+  
+  // create a JSonDriver instance
+    QJson::Parser parser;
+    bool ok;
+    
+  
+    UDSEntry e;
 
+    e.clear();
+    e.insert( KIO::UDSEntry::UDS_NAME, QFile::decodeName("Cheese"));
+    e.insert( KIO::UDSEntry::UDS_FILE_TYPE, S_IFDIR);
+    e.insert( KIO::UDSEntry::UDS_ACCESS, 0400);
+    e.insert( KIO::UDSEntry::UDS_SIZE, 10);
+  
+    listEntry(e,false);
+    
+    listEntry(e,true);
+    
+    finished();
 //   enterLoop();
 
 //   emit leaveModality();

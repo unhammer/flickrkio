@@ -1,9 +1,8 @@
 PROJECT( flickrkio )
-set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_SOURCE_DIR}/cmake/modules/)
+set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH})
 
 
 FIND_PACKAGE(KDE4 REQUIRED)
-FIND_PACKAGE(QPackageKit REQUIRED)
 INCLUDE_DIRECTORIES( ${KDE4_INCLUDES} . )
 include_directories (${CMAKE_CURRENT_BINARY_DIR})
 
@@ -13,7 +12,7 @@ set(kio_flickr_PART_SRCS
 
 kde4_add_plugin(kio_flickr ${kio_flickr_PART_SRCS})
 
-target_link_libraries(kio_flickr ${KDE4_KIO_LIBS})
+target_link_libraries(kio_flickr ${KDE4_KIO_LIBS} qjson)
 
 install(TARGETS kio_flickr  DESTINATION ${PLUGIN_INSTALL_DIR})
 
