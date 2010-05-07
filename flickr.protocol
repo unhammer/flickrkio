@@ -1,0 +1,13 @@
+[Protocol]
+exec=kio_flickr
+input=none
+output=filesystem
+listing=Name,Type,Size,Access
+protocol=package
+reading=true
+writing=false
+makedir=false
+deleting=false
+linking=false
+Icon=folder-tar
+moving=false
