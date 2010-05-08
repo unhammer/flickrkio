@@ -8,8 +8,8 @@
  */
 class flickrkio :  public KIO::ForwardingSlaveBase
 {
-  Q_OBJECT
-  public:
+    Q_OBJECT
+public:
     flickrkio( const QByteArray &pool, const QByteArray &app );
     void get( const KUrl &url );
     void listDir( const KUrl &url );
