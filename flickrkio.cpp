@@ -8,6 +8,7 @@
 #include <kcmdlineargs.h>
 #include <qjson/parser.h>
 
+
 using namespace KIO;
 
 extern "C" int KDE_EXPORT kdemain( int argc, char **argv )
@@ -15,7 +16,7 @@ extern "C" int KDE_EXPORT kdemain( int argc, char **argv )
     kDebug(7233) << "Entering function";
     KComponentData instance( "kio_flirckkio" );
 
-    //need an app to have an eventloop
+    //need an app to have an eventloop, which is needed for our http downloads
     putenv(strdup("SESSION_MANAGER="));
     KCmdLineArgs::init(argc, argv, "kio_flickr", 0, KLocalizedString(), 0, KLocalizedString());
     KCmdLineOptions options;
@@ -37,9 +38,22 @@ extern "C" int KDE_EXPORT kdemain( int argc, char **argv )
 
 void flickrkio::get( const KUrl &url )
 {
-    //fetch the real image now.
+//   QString photo_id = url.
+
+    KUrl getPhotoUrlQuery("http://api.flickr.com/services/rest/?method=flickr.photos.getSizes");
+    getPhotoUrlQuery.addQueryItem("api_key",FLICKR_API_KEY);
+    getPhotoUrlQuery.addQueryItem("photo_id","2465467234");
+    getPhotoUrlQuery.addQueryItem("format","json");
+    getPhotoUrlQuery.addQueryItem("nojsoncallback","1");
+
+
+//   messageBox(getPhotoUrlQuery.prettyUrl(),SlaveBase::Information);
+
+    //forward to the real image now.
     ForwardingSlaveBase::get(KUrl("http://api.kde.org/4.x-api/kdelibs-apidocs/top-kde.jpg"));
 }
+
+
 
 void flickrkio::stat( const KUrl &url )
 {
@@ -53,17 +67,6 @@ bool flickrkio::rewriteUrl(const KUrl&, KUrl&)
 {
     return true;
 }
-
-//we need to have a loop otherwise our signals don't get processed
-void flickrkio::enterLoop()
-{
-    QEventLoop eventLoop;
-
-    //kill the loop when flickrkio finishes - so the program can end.
-    connect(this, SIGNAL(leaveModality()),&eventLoop, SLOT(quit()));
-    eventLoop.exec(QEventLoop::ExcludeUserInputEvents);
-}
-
 
 
 void flickrkio::listDir( const KUrl &url )
@@ -154,6 +157,17 @@ void flickrkio::listDir( const KUrl &url )
 }
 
 
+
+
+//we need to have a loop otherwise our signals don't get processed
+void flickrkio::enterLoop()
+{
+    QEventLoop eventLoop;
+
+    //kill the loop when flickrkio finishes - so the program can end.
+    connect(this, SIGNAL(leaveModality()),&eventLoop, SLOT(quit()));
+    eventLoop.exec(QEventLoop::ExcludeUserInputEvents);
+}
 
 flickrkio::flickrkio( const QByteArray &pool, const QByteArray &app ):
         ForwardingSlaveBase( "flickrkio", pool, app ) {}
