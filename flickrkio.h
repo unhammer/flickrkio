@@ -2,6 +2,7 @@
 #define PACKAGEKIO_H
 
 #include <kio/forwardingslavebase.h>
+#include <QNetworkReply>
 
 #define FLICKR_API_KEY "aa7b4ac1428ee1f50e6acaf11f23708d"
 #define FLICKR_SECRET "8d31579fd9b68ede"
@@ -17,8 +18,11 @@ public:
     void get( const KUrl &url );
     void listDir( const KUrl &url );
     void stat( const KUrl &url );
-    void enterLoop(void);
     bool rewriteUrl(const KUrl&, KUrl&);
+
+private:
+    void blockUntilFinished(QNetworkReply*);
+
 
 };
 
