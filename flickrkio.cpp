@@ -52,22 +52,11 @@ void flickrkio::get( const KUrl &url )
 //     }
     QString photo_id = url.path().section('/',-1);
 
-    KUrl getPhotoUrlQuery("http://api.flickr.com/services/rest/?method=flickr.photos.getSizes");
-    getPhotoUrlQuery.addQueryItem("api_key",FLICKR_API_KEY);
-    getPhotoUrlQuery.addQueryItem("format","json");
-    getPhotoUrlQuery.addQueryItem("nojsoncallback","1");
+    QMap<QString,QString> queryArgs;
 
-    getPhotoUrlQuery.addQueryItem("photo_id",photo_id);
+    queryArgs["photo_id"] = photo_id;
 
-
-    QNetworkAccessManager accessManager(this);
-    QNetworkReply* getPhotoUrlReply = accessManager.get(QNetworkRequest(getPhotoUrlQuery));
-    blockUntilFinished(getPhotoUrlReply);
-
-    QJson::Parser parser;
-    bool ok;
-
-    QVariantMap result = parser.parse(getPhotoUrlReply->readAll(),&ok).toMap();
+    QVariantMap result = flickrQuery("flickr.photos.getSizes",queryArgs);
 
     //FIXME lazily assumes "original size" is last in the list.. could do with fixing
     //not as crash prone as it appears - toMap()/toList create empty lists if QVariant cannot be converted
@@ -96,40 +85,60 @@ bool flickrkio::rewriteUrl(const KUrl&, KUrl&)
 
 void flickrkio::listDir( const KUrl &url )
 {
-    kDebug() << "Start List Dir";
-    QString userId = "12809175@N00";
-
-    if (url.user().isEmpty())
-    {
-        messageBox("Please visit flickr:/yourusername@/. Note this will be fixed shortly.")
-        finished();
-        return;
-    }
-    else
-    {
-        //lookup username
-    }
-
     if (url.path().isEmpty() || url.path() == "/")
     {
-        //list photosets
+        AuthInfo info;
+        QString userId;
 
-        QJson::Parser parser;
-        bool ok;
+        info.url = KUrl("flickr://");
 
-        KUrl getPhotoSetsListQuery("http://api.flickr.com/services/rest/?method=flickr.photosets.getList");
-        getPhotoSetsListQuery.addQueryItem("api_key",FLICKR_API_KEY);
-        getPhotoSetsListQuery.addQueryItem("format","json");
-        getPhotoSetsListQuery.addQueryItem("nojsoncallback","1");
+        infoMessage("here");
 
-        getPhotoSetsListQuery.addQueryItem("user_id",userId);
+        if (! checkCachedAuthentication(info) || info.password.isEmpty() || true)
+        {
+            //open password dialog is rubbish..it doesn't do anything...GAH
+            //FIXME!!!
+            openPasswordDialog(info,"Please enter your flickr username (note password isn't acutally used)");
+        }
 
-        QNetworkAccessManager accessManager(this);
-        QNetworkReply* getPhotoSetsListReply = accessManager.get(QNetworkRequest(getPhotoSetsListQuery));
-        blockUntilFinished(getPhotoSetsListReply);
+        if (! url.user().isEmpty())
+        {
+            info.username = url.user();
+        }
 
-        QVariantMap result = parser.parse(getPhotoSetsListReply->readAll(),&ok).toMap();
+        if (! info.username.isEmpty())
+        {
+            QMap<QString,QString> queryArgs;
 
+            queryArgs["username"] = info.username;
+
+            QVariantMap result = flickrQuery("flickr.people.findByUsername",queryArgs);
+
+            userId = result["user"].toMap()["nsid"].toString();
+
+            if (userId.isEmpty())
+            {
+                warning(QString("Could not find Flickr user"));
+                finished();
+                return;
+            }
+            else
+            {
+                infoMessage(info.username);
+                cacheAuthentication(info);
+            }
+        }
+        else
+        {
+            warning("no flickr username supplied");
+        }
+
+
+
+        QMap<QString,QString> queryArgs;
+        queryArgs["user_id"] = userId;
+
+        QVariantMap result = flickrQuery("flickr.photosets.getList", queryArgs);
         UDSEntry e;
 
         foreach (QVariant photoset, result["photosets"].toMap()["photoset"].toList())
@@ -156,24 +165,12 @@ void flickrkio::listDir( const KUrl &url )
     }
     else
     {
-        //list photos
-        QJson::Parser parser;
-        bool ok;
         QStringList folderPaths = url.path().split("/",QString::SkipEmptyParts);
 
-        KUrl getPhotoSetsPhotosQuery("http://api.flickr.com/services/rest/?method=flickr.photosets.getPhotos");
-        getPhotoSetsPhotosQuery.addQueryItem("api_key",FLICKR_API_KEY);
-        getPhotoSetsPhotosQuery.addQueryItem("format","json");
-        getPhotoSetsPhotosQuery.addQueryItem("nojsoncallback","1");
-
-        getPhotoSetsPhotosQuery.addQueryItem("photoset_id",folderPaths[0]);
-
-
-        QNetworkAccessManager accessManager(this);
-        QNetworkReply* getPhotoSetsPhotosReply = accessManager.get(QNetworkRequest(getPhotoSetsPhotosQuery));
-        blockUntilFinished(getPhotoSetsPhotosReply);
-
-        QVariantMap result = parser.parse(getPhotoSetsPhotosReply->readAll(),&ok).toMap();
+        //list photos
+        QMap <QString,QString> queryArgs;
+        queryArgs["photoset_id"] = folderPaths[0];
+        QVariantMap result = flickrQuery("flickr.photosets.getPhotos",queryArgs);
 
         UDSEntry e;
 
@@ -195,23 +192,45 @@ void flickrkio::listDir( const KUrl &url )
 
         e.clear();
         listEntry(e,true);
-
         finished();
 
     }
-    kDebug(7233) << "End List Dir";
 }
 
 
-//we need to have a loop otherwise our signals don't get processed
-//turns accessmanager get request into something synchronous
-void flickrkio::blockUntilFinished(QNetworkReply *accessManager)
+QVariantMap flickrkio::flickrQuery(QString method, QMap<QString,QString> queryItems)
 {
     QEventLoop eventLoop;
-    //kill the loop when accessmanager finishes - so the program can continue.
-    connect(accessManager, SIGNAL(finished()),&eventLoop, SLOT(quit()));
+
+    KUrl query("http://api.flickr.com/services/rest/");
+    query.addQueryItem("method",method);
+    query.addQueryItem("api_key",FLICKR_API_KEY);
+    query.addQueryItem("format","json");
+    query.addQueryItem("nojsoncallback","1");
+
+    QMapIterator<QString, QString> i(queryItems);
+    while (i.hasNext())
+    {
+        i.next();
+        query.addQueryItem(i.key(),i.value());
+    }
+
+    QNetworkAccessManager accessManager(this);
+
+    //block until finished - when network operation finished, event loop quits and we continue our function
+
+    QNetworkReply* reply = accessManager.get(QNetworkRequest(query));
+    connect(reply, SIGNAL(finished()),&eventLoop, SLOT(quit()));
     eventLoop.exec(QEventLoop::ExcludeUserInputEvents);
+
+    //return parsed results
+    QJson::Parser parser;
+    bool ok;
+
+    return parser.parse(reply->readAll(),&ok).toMap();
+    //FIXME if !ok -> raise some kind of error.
 }
+
 
 flickrkio::flickrkio( const QByteArray &pool, const QByteArray &app ):
         ForwardingSlaveBase( "flickrkio", pool, app ) {}

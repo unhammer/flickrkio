@@ -21,8 +21,8 @@ public:
     bool rewriteUrl(const KUrl&, KUrl&);
 
 private:
-    void blockUntilFinished(QNetworkReply*);
-
+    /** Executes Flickr API query synchronously, parses JSON returns as QVariants.*/
+    QVariantMap flickrQuery(QString method, QMap<QString,QString> queryItems);
 
 };
 
