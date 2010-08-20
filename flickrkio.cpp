@@ -40,6 +40,7 @@ extern "C" int KDE_EXPORT kdemain( int argc, char **argv )
     return 0;
 }
 
+/* Currently not used for anything, since we just link: */
 void flickrkio::get( const KUrl &url )
 {
     //if it's not a photo, the user has gone wrong
@@ -82,10 +83,11 @@ bool flickrkio::rewriteUrl(const KUrl&, KUrl&)
     return true;
 }
 
-
 void flickrkio::listDir( const KUrl &url )
 {
-    if (url.path().isEmpty() || url.path() == "/")
+    QStringList folderPaths = url.path().split("/",QString::SkipEmptyParts);
+
+    if (url.path().isEmpty() || url.path() == "/") // looking at our list of sets
     {
         AuthInfo info;
         QString userId;
@@ -98,7 +100,7 @@ void flickrkio::listDir( const KUrl &url )
         {
             //open password dialog is rubbish..it doesn't do anything...GAH
             //FIXME!!!
-            openPasswordDialog(info,"Please enter your flickr username (note password isn't acutally used)");
+            //openPasswordDialog(info,"Please enter your flickr username (note password isn't actually used)");
         }
 
         if (! url.user().isEmpty())
@@ -109,9 +111,7 @@ void flickrkio::listDir( const KUrl &url )
         if (! info.username.isEmpty())
         {
             QMap<QString,QString> queryArgs;
-
             queryArgs["username"] = info.username;
-
             QVariantMap result = flickrQuery("flickr.people.findByUsername",queryArgs);
 
             userId = result["user"].toMap()["nsid"].toString();
@@ -137,7 +137,6 @@ void flickrkio::listDir( const KUrl &url )
 
         QMap<QString,QString> queryArgs;
         queryArgs["user_id"] = userId;
-
         QVariantMap result = flickrQuery("flickr.photosets.getList", queryArgs);
         UDSEntry e;
 
@@ -163,17 +162,15 @@ void flickrkio::listDir( const KUrl &url )
 
         finished();
     }
-    else
+    else if(folderPaths.size() == 1) // looking at a certain set
     {
-        QStringList folderPaths = url.path().split("/",QString::SkipEmptyParts);
-
         //list photos
         QMap <QString,QString> queryArgs;
         queryArgs["photoset_id"] = folderPaths[0];
         QVariantMap result = flickrQuery("flickr.photosets.getPhotos",queryArgs);
 
         UDSEntry e;
-
+	
         foreach (QVariant photo, result["photoset"].toMap()["photo"].toList())
         {
             QString filename = photo.toMap()["title"].toString().append(".jpg");
@@ -181,11 +178,54 @@ void flickrkio::listDir( const KUrl &url )
 
             e.clear();
             e.insert( KIO::UDSEntry::UDS_NAME, photo_id);
-            e.insert( KIO::UDSEntry::UDS_DISPLAY_NAME, filename);
-            e.insert( KIO::UDSEntry::UDS_MIME_TYPE, "image/jpeg");
-            e.insert( KIO::UDSEntry::UDS_FILE_TYPE, S_IFREG); //normal file
+	    e.insert( KIO::UDSEntry::UDS_DISPLAY_NAME, filename);
+            e.insert( KIO::UDSEntry::UDS_FILE_TYPE, S_IFDIR); // directory of sizes
             e.insert( KIO::UDSEntry::UDS_ACCESS, 0400);
+            e.insert( KIO::UDSEntry::UDS_SIZE, 10);
+	    if (false) {
+		QMap<QString,QString> queryArgs_p;
+		queryArgs_p["photo_id"] = photo_id;
+		QVariantMap result = flickrQuery("flickr.photos.getSizes",queryArgs_p);
+		QString photoUrl_t;
+		QVariantList sizes = result["sizes"].toMap()["size"].toList();
+		foreach (QVariant size, sizes ) {
+		    QString label = size.toMap()["label"].toString();
+		    photoUrl_t = size.toMap()["source"].toString();
+		    if(label == QString("Thumbnail")) break;
+		}
+		e.insert( KIO::UDSEntry::UDS_ICON_NAME, photoUrl_t);
+	    }
+            listEntry(e,false);
+        }
 
+        e.clear();
+        listEntry(e,true);
+        finished();
+
+    }
+    else			// looking at a certain photo, list of sizes
+    {
+        //list photos
+        QMap <QString,QString> queryArgs;
+        queryArgs["photo_id"] = folderPaths[1];
+        QVariantMap result = flickrQuery("flickr.photos.getSizes",queryArgs);
+
+        UDSEntry e;
+	
+        foreach (QVariant size, result["sizes"].toMap()["size"].toList())
+        {
+            QString label = size.toMap()["label"].toString();
+            QString filename = size.toMap()["source"].toString();
+
+            e.clear();
+            e.insert( KIO::UDSEntry::UDS_NAME, filename);
+            e.insert( KIO::UDSEntry::UDS_DISPLAY_NAME, label);
+	    // opens in web browser when we set this:
+            e.insert( KIO::UDSEntry::UDS_URL, filename);
+            e.insert( KIO::UDSEntry::UDS_MIME_TYPE, "image/jpeg");
+            e.insert( KIO::UDSEntry::UDS_FILE_TYPE, S_IFREG); // normal file
+            e.insert( KIO::UDSEntry::UDS_ACCESS, 0400);
+	    // ironically flickr doesn't provide file size in "sizes":
             e.insert( KIO::UDSEntry::UDS_SIZE, 10);
             listEntry(e,false);
         }
