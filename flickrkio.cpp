@@ -205,13 +205,27 @@ void flickrkio::listDir( const KUrl &url )
     }
     else			// looking at a certain photo, list of sizes
     {
-        //list photos
+	UDSEntry e;
+
+        QMap <QString,QString> queryArgs1;
+        queryArgs1["photo_id"] = folderPaths[1];
+        QVariantMap result = flickrQuery("flickr.photos.getSizes",queryArgs);
+	
+	QString webpage = result.toMap()["url"].toString();
+	e.clear();
+	e.insert( KIO::UDSEntry::UDS_NAME, webpage);
+	e.insert( KIO::UDSEntry::UDS_DISPLAY_NAME, QString("web page"));
+	e.insert( KIO::UDSEntry::UDS_URL, webpage);
+	// e.insert( KIO::UDSEntry::UDS_MIME_TYPE, "image/jpeg"); // FIXME
+	e.insert( KIO::UDSEntry::UDS_FILE_TYPE, S_IFREG); // normal file? FIXME
+	e.insert( KIO::UDSEntry::UDS_ACCESS, 0400);
+	e.insert( KIO::UDSEntry::UDS_SIZE, 10);
+	listEntry(e,false);
+
+        //list sizes
         QMap <QString,QString> queryArgs;
         queryArgs["photo_id"] = folderPaths[1];
         QVariantMap result = flickrQuery("flickr.photos.getSizes",queryArgs);
-
-        UDSEntry e;
-	
         foreach (QVariant size, result["sizes"].toMap()["size"].toList())
         {
             QString label = size.toMap()["label"].toString();
