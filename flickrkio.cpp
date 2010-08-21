@@ -207,22 +207,32 @@ void flickrkio::listDir( const KUrl &url )
     {
 	UDSEntry e;
 
+	// list web pages
         QMap <QString,QString> queryArgs1;
         queryArgs1["photo_id"] = folderPaths[1];
-        QVariantMap result = flickrQuery("flickr.photos.getSizes",queryArgs);
+        QVariantMap result1 = flickrQuery("flickr.photos.getInfo",queryArgs1);
+	QVariantMap map = result1["photo"].toMap()["urls"].toMap();
+	QVariantMap::Iterator it = map.begin();
+	while(it != map.end()) {
+		foreach (QVariant url, (*it).toList()) {
+			QString the_url = url.toMap()["_content"].toString();
+			QString type = url.toMap()["type"].toString();
+			e.clear();
+			e.insert( KIO::UDSEntry::UDS_NAME, the_url);
+			e.insert( KIO::UDSEntry::UDS_DISPLAY_NAME, type);
+			e.insert( KIO::UDSEntry::UDS_URL, the_url);
+			e.insert( KIO::UDSEntry::UDS_MIME_TYPE, "text/html"); // FIXME
+			e.insert( KIO::UDSEntry::UDS_FILE_TYPE, S_IFREG); // normal file? FIXME
+			e.insert( KIO::UDSEntry::UDS_ACCESS, 0400);
+			e.insert( KIO::UDSEntry::UDS_SIZE, 10);
+			listEntry(e,false);
+		}		
+		++it;
+	}
+        e.clear();
+        listEntry(e,true);
 	
-	QString webpage = result.toMap()["url"].toString();
-	e.clear();
-	e.insert( KIO::UDSEntry::UDS_NAME, webpage);
-	e.insert( KIO::UDSEntry::UDS_DISPLAY_NAME, QString("web page"));
-	e.insert( KIO::UDSEntry::UDS_URL, webpage);
-	// e.insert( KIO::UDSEntry::UDS_MIME_TYPE, "image/jpeg"); // FIXME
-	e.insert( KIO::UDSEntry::UDS_FILE_TYPE, S_IFREG); // normal file? FIXME
-	e.insert( KIO::UDSEntry::UDS_ACCESS, 0400);
-	e.insert( KIO::UDSEntry::UDS_SIZE, 10);
-	listEntry(e,false);
-
-        //list sizes
+        // list sizes
         QMap <QString,QString> queryArgs;
         queryArgs["photo_id"] = folderPaths[1];
         QVariantMap result = flickrQuery("flickr.photos.getSizes",queryArgs);
